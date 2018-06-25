@@ -62,22 +62,15 @@ run :: Protocol
 run proto host port path headers = do
 
     -- Setup a "mailbox" for getting messages from and placing them in.
-    (output, input) <- spawn unbounded
+    -- (output, input) <- spawn unbounded
     
-    let 
+    let msgsFrom  = runEffect $ 
+                      for wsIn 
+                        (\s -> lift . lift $ putStrLn $ "Received 1: " ++ unpack s)
 
-        msgsFrom  = runEffect $ wsIn 
-                        >-> P.chain (\s -> lift $ putStrLn $ "Received 1: " ++ unpack s)
-                        >-> toOutput output
-
-    lvf $ runEffect $ for (fromInput input)  
-                          (\s -> lift $ putStrLn ("Received: " ++ unpack s))
-
-    let clientApp = \c -> lvf $ runReaderT msgsFrom c
-
+    let clientApp = \c -> runReaderT msgsFrom c
 
     case proto of
       Wss -> Wuss.runSecureClientWith host (fromIntegral port) path defaultConnectionOptions headers clientApp
       Ws -> WS.runClientWith host port path defaultConnectionOptions headers clientApp
-  where
-    lvf = liftIO . void . forkIO
+    -- lvf = liftIO . void . forkIO
