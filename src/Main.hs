@@ -39,9 +39,6 @@ main = do
   let hs = [("_sessid", _sessid)]
   run _host _port _path hs
 
-  -- runClientWith host port path opts headers clientApp
-
-
 run :: String  -- ^ host
     -> Int -- ^ port
     -> String -- ^ path
