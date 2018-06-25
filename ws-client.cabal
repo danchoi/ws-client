@@ -25,3 +25,4 @@ executable ws-client
                      , pipes-websockets
                      , pipes-concurrency
                      , transformers
+                     , optparse-applicative

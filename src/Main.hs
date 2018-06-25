@@ -9,42 +9,58 @@ import qualified Pipes.Prelude as P
 import Pipes.WebSockets
 import Pipes.Concurrent
 import Data.Text
+import Data.Monoid
 import Control.Monad.Trans.Reader (ReaderT (runReaderT))
+import Options.Applicative
+import qualified Data.ByteString.Char8 as B8
+
+
+data Options = Options {
+    _host :: String
+  , _port :: Int
+  , _path :: String
+  , _sessid :: B8.ByteString
+  } deriving Show
+
+options :: Parser Options
+options = Options 
+  <$> strArgument (metavar "HOST")
+  <*> argument auto (metavar "PORT")
+  <*> strArgument (metavar "PATH")
+  <*> (B8.pack <$> strArgument (metavar "_sessid"))
+
+opts :: ParserInfo Options
+opts = info (options <**> helper)
+            (fullDesc <> header "ws-client")
 
 main :: IO ()
 main = do
-  putStrLn "hello world"
+  Options{..} <- execParser opts
+  let hs = [("_sessid", _sessid)]
+  run _host _port _path hs
 
   -- runClientWith host port path opts headers clientApp
-
 
 
 run :: String  -- ^ host
     -> Int -- ^ port
     -> String -- ^ path
     -> Headers
-    -> Connection -> IO ()
-run host port path headers c = do
+    -> IO ()
+run host port path headers = do
 
     -- Setup a "mailbox" for getting messages from and placing them in.
     (output, input) <- spawn unbounded
     
-                 -- Take messages from the socket and put them in the output.
-    let msgsFrom = runEffect $ wsIn >-> toOutput output
-                 -- Read from stdin and send msgs to the server.
-        msgsTo   = runEffect $ for P.stdinLn
-                                   (\s -> yield (pack s) >-> wsOut)
-        --
-        --  Read messages from the socket (which have been placed on the
-        --  mailbox) and print to stdout.
-        msgsOut  = runEffect $ for (fromInput input) 
-                                   (\s -> lift $ putStrLn ("Received: " ++ unpack s))
+    let 
 
-    lvf $ msgsOut
+        msgsFrom  = runEffect $ wsIn >-> toOutput output
 
-    let clientApp = \c -> do
-                                lvf $ runReaderT msgsFrom c
-                                runReaderT msgsTo c
+    lvf $ runEffect $ for (fromInput input)  
+                          (\s -> lift $ putStrLn ("Received: " ++ unpack s))
+
+    let clientApp = \c -> lvf $ runReaderT msgsFrom c
+
 
     WS.runClientWith host port path defaultConnectionOptions headers clientApp
   where
